@@ -2,7 +2,7 @@
   "expo": {
     "name": "MultiPost",
     "slug": "MultiPost",
-    "version": "1.0.0",
+    "version": "1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -18,10 +18,16 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.rafacu.MultiPost"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "2ed0b3dc-978f-4c18-af5c-ff3c9a0f20e5"
+      }
     }
   }
 }
