@@ -46,6 +46,8 @@ export default function App() {
 
     const [postUrl, setPostUrl] = useState('');
     const [dataPost, setDataPost] = useState<DataPost>();
+    const [groupGetData, setGroupGetData] = useState<Group>();
+    
     
     const [url, setUrl] = useState<string>(postUrl && !dataPost?postUrl:'https://www.facebook.com/' );
     
@@ -55,10 +57,8 @@ export default function App() {
         if(isPosting || loadingGroups) return;
         setTabSelected("facebook"); 
         setUrl('https://www.facebook.com/')        
-        //webviewRef?.current.reload()
+        webviewRef?.current.reload()
     }
-
-
     
     const handlerPressMultipost = () => {
         if(loginRequired) {
@@ -72,9 +72,9 @@ export default function App() {
         }
         else if(groups.length === 0 && !loadingGroups) {
             setTabSelected("mp");
-            setUrl('https://www.facebook.com/groups/joins/?nav_source=tab&ordering=viewer_added');
+            setUrl('https://www.facebook.com/');//groups/joins/?nav_source=tab&ordering=viewer_added
             setTimeout(function() {
-                getGroups();
+                getGroups2();
             }, 2000);
         }
         else setTabSelected("mp");
@@ -87,10 +87,10 @@ export default function App() {
         
         
         setTimeout(function() {
-            setUrl('https://www.facebook.com/groups/joins/?nav_source=tab&ordering=viewer_added');
+            setUrl('https://www.facebook.com/');//groups/joins/?nav_source=tab&ordering=viewer_added
             setTimeout(function() {
                     setGroups([])
-                    getGroups();
+                    getGroups2();
             }, 2000);
         }, 200);
     }
@@ -124,6 +124,7 @@ export default function App() {
     const handleSendPost = () => {
         if(isPosting) return;
         setIsPosting(true);
+        //sendPostOld();
         sendPost(0)
         
         const selectedSendGroups:Group[] = Array.from(groups.filter(g => g.select === true))
@@ -262,57 +263,80 @@ export default function App() {
                 function() {
                     const jsCode = `
                             
-                    async function sendPost() { 
-                        const targetDiv = document.querySelectorAll('div[data-mcomponent="MContainer"]');
-                        
+                    async function sendPost() {                        
                         try {
-                            for (let i = 0; i < targetDiv.length; i++) {
-                                const div = targetDiv[i];
+                            // Intentar cerrar el pop-up "Not now"
+                            const notNowButton = document.querySelector('div[aria-label="Not now"]');
+                            if (notNowButton) {
+                                notNowButton.children[0].click();
+                            }
+                        } catch (e) {
+                            const jsonString = JSON.stringify({
+                                key: 'log',
+                                value: e.toString()
+                            });
+                            window.ReactNativeWebView.postMessage(jsonString);
+                        }
 
-                                if (div.innerHTML.toString().includes('Write something...')) {
-                                    div.click();
+                        try {
+                            const containsWriteSomething = document.body.innerHTML.includes('Write something...').toString();
 
-                                    setTimeout( function() {                                    
-                                        const textDiv = document.querySelector('div[aria-label="Write something"]');
-                                        textDiv.click();
-                                        
-                                        const textarea = document.querySelector('textarea');
-                                        textarea.value = "${postUrl}";
-                                        textarea.dispatchEvent(new Event('input', { bubbles: true }));
-                                        
-                                        const scrollable = document.querySelector('div[data-is-h-scrollable="true"]');
-                                        scrollable.children[0].click();
+                            if (containsWriteSomething === 'true') {
+                                const targetDivs = document.querySelectorAll('div[data-mcomponent="MContainer"]');
+
+                                for (let i = 0; i < targetDivs.length; i++) {
+                                    const div = targetDivs[i];
+
+                                    if (div.innerHTML.includes('Write something...')) {
+                                        div.click();
+
                                         setTimeout(function() {
-                                            const btn = document.querySelector('div[aria-label="POST"]');
-                                            btn.click();
+                                            const textDiv = document.querySelector('div[aria-label="Write something"]');
+                                            if (textDiv) {
+                                                textDiv.click();
 
-                                            const jsonString = JSON.stringify({
-                                                key: 'sendPost',
-                                                value: ${indexSendingPost}
-                                            });
-                                            window.ReactNativeWebView.postMessage(jsonString)
-                                        }, 2000);;
+                                                const textarea = document.querySelector('textarea');
+                                                if (textarea) {
+                                                    textarea.value = "${postUrl}";
+                                                    textarea.dispatchEvent(new Event('input', { bubbles: true }));
 
-                                    }, 2000);
+                                                    const scrollable = document.querySelector('div[data-is-h-scrollable="true"]');
+                                                    if (scrollable && scrollable.children.length > 0) {
+                                                        scrollable.children[0].click();
+                                                        
+                                                        setTimeout(function() {
+                                                            const btn = document.querySelector('div[aria-label="POST"]');
+                                                            if (btn) {
+                                                                btn.click();
+                                                            }
+                                                        }, 2000);
+                                                    }
+                                                }
+                                            }
+                                        }, 2000);
+                                    } else if (div.innerHTML.includes('What are you selling?')) {
+                                        // Lógica para manejar esta condición si es necesario
+                                    }
                                 }
-                                else if(div.innerHTML.toString().includes('What are you selling?')){
-                                    const jsonString = JSON.stringify({
-                                        key: 'sendPost',
-                                        value: ${indexSendingPost}
-                                    });
-                                    window.ReactNativeWebView.postMessage(jsonString)
-                                }
-                            };
+                            }
+                        } catch (e) {                         
+                            const jsonString = JSON.stringify({
+                                key: 'log',
+                                value: e.toString()
+                            });
+                            window.ReactNativeWebView.postMessage(jsonString);
+                        }
 
-                        }catch (error) {
+                        
+                        setTimeout(function() {
                             const jsonString = JSON.stringify({
                                 key: 'sendPost',
                                 value: ${indexSendingPost}
                             });
-                            window.ReactNativeWebView.postMessage(jsonString)
-                        }
-
+                            window.ReactNativeWebView.postMessage(jsonString);
+                        }, 6000);
                     }
+
                         
                     
                     (function() {
@@ -323,99 +347,7 @@ export default function App() {
                         } else {
                             sendPost()
                         }
-                    })();
-            
-                    true;`;
-                    webviewRef?.current.injectJavaScript(jsCode);
-            }, 2000);
-            
-            await new Promise(resolve => setTimeout(resolve, 4000)); 
-        }
-        
-        send();
-        
-    };    
-
-    const sendPostOld = async (indexSendingPost: number) => {
-        const selectedSendGroups:Group[] = Array.from(groups.filter(g => g.select === true))
-        async function send() { 
-            setUrl(`https://facebook.com/groups/${selectedSendGroups[indexSendingPost].url}/`)
-            
-            setTimeout(
-                function() {
-                    const jsCode = `
-                    async function getGroupsData() { 
-                        const url = 'https://www.facebook.com/api/graphql/';
-                        const data = {
-                            av: '61560497301814',
-                            __aaid: '0',
-                            __user: '61560497301814',
-                            __a: '1',
-                            __req: '1n',
-                            __hs: '19957.HYP:comet_pkg.2.1..2.1',
-                            dpr: '1',
-                            __ccg: 'EXCELLENT',
-                            __rev: '1015896319',
-                            __s: 'hewg88:rri1kf:1w1bwa',
-                            __hsi: '7406052533869143187',
-                            __dyn: '7AzHK4HwkEng5K8G6EjBAg5S3G2O5U4e2C17xt3odE98K360CEboG0x8bo6u3y4o2Gwfi0LVEtwMw65xO321Rwwwqo462mcwfG12wOx62G5Usw9m1YwBgK7o6C0Mo4G1hx-3m1mzXw8W58jwGzEaE5e3ym2SU4i5oe8464-5pU9UmwUwxwjFovUaU3VwLKq2-azqwaW223908O3216xi4UK2K364UrwFg2fwxyo566k1FwgU4q3G1eKufxa3mUqwjVqwLwHw',
-                            __csr: 'g9Ilfb6gX7n3IYoCgV3n8Ylbsr6Rr99dPPqAkyRaACBFEvZPYyZETOf8xPn9VdiWqnuGl6ky45llui9l9KHAqGhuldUWuhkhfn9KVKdUOHBz9uVebAyqiVBhBK8gRarCAwFx6le9Azk8FeVohUCumUKmiUGqp3EboGdDxCGgK5EiKiui3no-5UvyU9pbK3W4UKV8cokwaCdxiXyEixK4U88nwuo561wwADwPw5Jg7e5A18wcK2e1kw3So0Fzw1EW4pU42Emw0569Cw2Wk0q20my0dHw0wCwg819U7y02NW08Fw3-804pO5o0ctE6y0nZ05OwZxK0nq06KU',
-                            __comet_req: '15',
-                            fb_dtsg: 'NAcMFGZKN9dbtMaZT56hJLntawzCoSlm5bA6E8syZp_eqtjzqDKydDQ:15:1724344418',
-                            jazoest: '25673',
-                            lsd: 'XvFKsk5Uw4PDFcZbU_LLMa',
-                            __spin_r: '1015896319',
-                            __spin_b: 'trunk',
-                            __spin_t: '1724355978',
-                            fb_api_caller_class: 'RelayModern',
-                            fb_api_req_friendly_name: 'GroupsCometComposerInterceptionPluginQuery',
-                            variables: JSON.stringify({
-                                groupID: '990039981076305',
-                                postText: 'https://www.facebook.com/share/8dDPoa67p8ofBmhq/?mibextid=WC7FNe',
-                                activeAttachmentType: 'LINK',
-                                footerAttachmentType: 'undefined'
-                            }),
-                            server_timestamps: 'true',
-                            doc_id: '5136032983095220'
-                        };
-
-                        fetch(url, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/x-www-form-urlencoded'
-                            },
-                            body: new URLSearchParams(data).toString()
-                            })
-                            .then(response => {
-                            if (!response.ok) {
-                                throw new Error('Network response was not ok');
-                            }
-                            return response;
-                        })
-                        .then(data => {
-                            const jsonString = JSON.stringify({
-                                key: 'log',
-                                value: data
-                            });
-                            window.ReactNativeWebView.postMessage(jsonString);
-                        })
-                        .catch(error => {
-                            alert('There was a problem with the fetch operation: ' + error.toString());
-                        });
-
-                    }
-                        
-                    
-                    (function() {
-                        if (document.readyState === 'loading') {
-                            document.addEventListener('DOMContentLoaded', function() {
-                                getGroupsData()
-                            });
-                        } else {
-                            getGroupsData()
-                        }
-                    })();
-            
+                    })();            
                     true;`;
                     webviewRef?.current.injectJavaScript(jsCode);
             }, 2000);
@@ -426,6 +358,148 @@ export default function App() {
         send();
         
     };
+
+    const sendPostOld = async () => {
+        async function send() { 
+            setUrl(`https://facebook.com/groups/7592195638/`);
+    
+            setTimeout(function() {
+                const jsCode = `
+                async function getGroupsData() { 
+                    const url = 'https://www.facebook.com/api/graphql/';
+                    
+                    const data = {
+                        av: '61560497301814',
+                        __aaid: '0',
+                        __user: '61560497301814',
+                        __a: '1',
+                        __req: '14',
+                        __hs: '19960.HYP:comet_pkg.2.1..2.1',
+                        dpr: '1',
+                        __ccg: 'EXCELLENT',
+                        __rev: '1015957941',
+                        __s: 'xkupm4:ii0lsm:4kkswq',
+                        __hsi: '7407096570085532803',
+                        __dyn: '7AzHK4HwkEng5K8G6EjBAg5S3G2O5U4e2C17xt3odE98K360CEboG0x8bo6u3y4o2Gwn82nwb-q7oc81xoswMwto886C11wBz83WwgEcEhwGxu782lwv89kbxS1Fwc61awkovwRwlE-U2exi4UaEW2G1jwUBwJK14xm3y11xfxmu2u5Ee88o4Wm7-2K0-obXCwLyESE2KwwwOg2cwMwhEkxebwHwNxe6Uak0zU8oC1hxB0qo4e16wWwjHBU-4EdrxG1fBG2-2K',
+                        __csr: 'g8A4BNQ54kIfN4W5ijEvpa5Pi8AQIx0zrkqz-z-zaDdikR4qT8KycZTcy9liZ4TGQWmRYBApaq-imWOqjFnOQldaby8DB_BQiHG8nG8CiLGAmeGBO6LqBKum-9GcUZeFpFWBGaGHUSiqXmUkyEWVqG8xmmEGqUC4UmjgmCCx658rixfhoy6poOUqwzyob888gz8WVEmy8C3ii9x6dCDzod8rxa2i2KaGewYyUcUO1hyEdoG0zo5e1AwhU727Ef88E148C9wcq2K3y04UU11U2Nwte1rwsiw2J801jpk0qYzy4aCg15k0pW08vw2NE08684a0qa3m04Q80chU07wi1-wTw4UDw-w7tw-wfm',
+                        __comet_req: '15',
+                        fb_dtsg: 'NAcOPDzCC5D-fPDRUgC_YiSiZvewj16ZrzotTEvBn_bA8xHC6hhM21Q:38:1724598982',
+                        jazoest: '25442',
+                        lsd: '3K9URMsvKGHXVZ--MCtcxI',
+                        __spin_r: '1015957941',
+                        __spin_b: 'trunk',
+                        __spin_t: '1724599062',
+                        fb_api_caller_class: 'RelayModern',
+                        fb_api_req_friendly_name: 'ComposerStoryCreateMutation',
+                        variables: JSON.stringify({
+                            "input": {
+                                "composer_entry_point": "inline_composer",
+                                "composer_source_surface": "group",
+                                "composer_type": "group",
+                                "logging": {
+                                    "composer_session_id": "68404f79-d2af-473a-b987-a7e93e2ebdcb"
+                                },
+                                "source": "WWW",
+                                "message": {
+                                    "ranges": [],
+                                    "text": "https://www.facebook.com/share/p/PRoJDcaECBn14tx2/"
+                                },
+                                "with_tags_ids": null,
+                                "inline_activities": [],
+                                "explicit_place_id": "0",
+                                "text_format_preset_id": "0",
+                                "attachments": [{
+                                    "link": {
+                                        "share_scrape_data": "{\"share_type\":37,\"share_params\":[1194324868507859]}"
+                                    }
+                                }],
+                                "navigation_data": {
+                                    "attribution_id_v2": "CometGroupDiscussionRoot.react,comet.group,via_cold_start,1724599066992,404784,2361831622,,"
+                                },
+                                "tracking": [null],
+                                "event_share_metadata": {
+                                    "surface": "newsfeed"
+                                },
+                                "audience": {
+                                    "to_id": "7592195638"
+                                },
+                                "actor_id": "61560497301814",
+                                "client_mutation_id": "1"
+                            },
+                            "feedLocation": "GROUP",
+                            "feedbackSource": 0,
+                            "focusCommentID": null,
+                            "gridMediaWidth": null,
+                            "groupID": null,
+                            "scale": 1,
+                            "privacySelectorRenderLocation": "COMET_STREAM",
+                            "checkPhotosToReelsUpsellEligibility": false,
+                            "renderLocation": "group",
+                            "useDefaultActor": false,
+                            "inviteShortLinkKey": null,
+                            "isFeed": false,
+                            "isFundraiser": false,
+                            "isFunFactPost": false,
+                            "isGroup": true,
+                            "isEvent": false,
+                            "isTimeline": false,
+                            "isSocialLearning": false,
+                            "isPageNewsFeed": false,
+                            "isProfileReviews": false,
+                            "isWorkSharedDraft": false,
+                            "hashtag": null,
+                            "canUserManageOffers": false,
+                            "__relay_internal__pv__CometUFIShareActionMigrationrelayprovider": true,
+                            "__relay_internal__pv__IncludeCommentWithAttachmentrelayprovider": true,
+                            "__relay_internal__pv__CometUFIReactionsEnableShortNamerelayprovider": false,
+                            "__relay_internal__pv__CometImmersivePhotoCanUserDisable3DMotionrelayprovider": false,
+                            "__relay_internal__pv__IsWorkUserrelayprovider": false,
+                            "__relay_internal__pv__IsMergQAPollsrelayprovider": false,
+                            "__relay_internal__pv__StoriesArmadilloReplyEnabledrelayprovider": true,
+                            "__relay_internal__pv__EventCometCardImage_prefetchEventImagerelayprovider": false
+                        }),
+                        server_timestamps: 'true',
+                        doc_id: '7703046043138503'
+                    };
+    
+                    fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        },
+                        body: new URLSearchParams(data).toString()
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response;
+                    })
+                    .then(data => {
+                        const jsonString = JSON.stringify({
+                            key: 'log',
+                            value: data
+                        });
+                        window.ReactNativeWebView.postMessage(jsonString);
+                    })
+                    .catch(error => {
+                        alert('There was a problem with the fetch operation: ' + error.toString());
+                    });
+    
+                }
+                    
+                getGroupsData();
+        
+                true;`;
+                webviewRef?.current.injectJavaScript(jsCode);
+            }, 2000);
+            
+            await new Promise(resolve => setTimeout(resolve, 4000)); 
+        }
+        
+        send();
+    };
+    
 
     const getGroups = () => {
         const jsCode = `
@@ -536,7 +610,7 @@ export default function App() {
                     const n = names[i]
                     
                     const jsonString = JSON.stringify({
-                        key: 'grupoGetData',
+                        key: 'groupGetData',
                         value: {
                             name:n.innerText,
                             img:images[i/2].src,
@@ -705,7 +779,7 @@ export default function App() {
     return (
         <SafeAreaView className="h-full flex flex-col">
             <WebView
-                className="h-full h-full"
+                className={`h-full h-full ${Platform.OS === 'android' && "mt-12"}`}
                 ref={webviewRef}
                 source={{ 
                     uri: url,
@@ -750,7 +824,7 @@ export default function App() {
                             setLoadingGroups(data.value)
                         }
                         if(data.key === 'sendPost') {
-                            const selectedSendGroups:Group[] = Array.from(groups.filter(g => g.select === true))
+                            const selectedSendGroups:Group[] = groups? Array.from(groups.filter(g => g.select === true)):[];
                             if(data.value + 1 < selectedSendGroups.length) {
                                 sendPost(data.value  + 1);
                                 setGroupPostingLoading(selectedSendGroups[data.value+1].url)
@@ -765,6 +839,10 @@ export default function App() {
                             setGroups(data.value)
                             setLoadingGroups(false)
                         }
+                        if(data.key === 'groupGetData') {
+                            setGroupGetData(data.value)
+                        }
+                        
                         if(data.key === 'getGroups2'){                            
                             setLoadingGroups(true)
 
@@ -784,12 +862,27 @@ export default function App() {
             />
             
             
-            <ScrollView className={tabSelected !== "facebook"? `bg-white h-1 w-full  mt-12 ${Platform.OS === 'android' && "mt-12"}`: "hidden"}>
+            <ScrollView className={tabSelected !== "facebook"? `bg-white h-full w-full absolute z-50 mt-12 ${Platform.OS === 'android' && "mt-12"}`: "hidden"}>
                 {
                     loadingGroups?
                     <View className="h-full flex flex-col items-center justify-center py-20" >
                         <ActivityIndicator size="large" color="gray" />
                         <Text className="text-md mt-1">Loading groups</Text>
+
+                        
+                        {   groupGetData &&
+                            <View className="flex flex-col px-3 py-4 m-8 w-max bg-blue-100 shadow rounded-xl h-24" >
+                                <Text className="text-md w-full font-bold">Geting data from:</Text>
+                                <View className="h-full flex flex-row items-center justify-center w-full space-x-4 mb-1">
+                                    <Image 
+                                        source={{ uri: groupGetData.img }} 
+                                        className="h-10 w-10 rounded-full"
+                                    />
+                                    <Text className="text-lg flex-1" numberOfLines={1}>{groupGetData.name}</Text>
+                                </View>
+                            </View>
+                        }
+
                     </View>
                     :
                     
@@ -855,7 +948,7 @@ export default function App() {
                             </View>
                         }
                         {
-                            groups.map((group, index) => (
+                            groups && groups.length > 0 && groups.map((group, index) => (
                             <View className={`flex flex-row items-center px-4 py-1 border-b-0.5 border-gray-300 space-x-3 ${isPosting && !Array.from(groups.filter(g => g.select === true)).includes(group) && "hidden"}`} key={index}>
 
                                 <Image 
