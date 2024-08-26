@@ -70,7 +70,7 @@ export default function App() {
                 ]
             );
         }
-        else if(groups.length === 0 && !loadingGroups) {
+        else if((!groups.length && !loadingGroups) || (groups.length === 0 && !loadingGroups)) {
             setTabSelected("mp");
             setUrl('https://www.facebook.com/');//groups/joins/?nav_source=tab&ordering=viewer_added
             setTimeout(function() {
@@ -872,7 +872,7 @@ export default function App() {
                         
                         {   groupGetData &&
                             <View className="flex flex-col px-3 py-4 m-8 w-max bg-blue-100 shadow rounded-xl h-24" >
-                                <Text className="text-md w-full font-bold">Geting data from:</Text>
+                                <Text className="text-md w-full font-bold">Getting data from:</Text>
                                 <View className="h-full flex flex-row items-center justify-center w-full space-x-4 mb-1">
                                     <Image 
                                         source={{ uri: groupGetData.img }} 
